@@ -1,0 +1,11 @@
+TRIAGE (Reels, 40 s) · @dokter.emergency
+
+Picture, score and sound effects: made in code for this film (Canvas 2D, numpy synthesis). No samples, stock footage or recordings.
+
+Third-party material in the film:
+- Inter Tight (weights 700, 900), by Bianca Berning, Rasmus Andersson et al. SIL Open Font License 1.1. https://fonts.google.com/specimen/Inter+Tight (fonts/OFL-InterTight.txt)
+- DM Mono (weight 500), by Colophon Foundry. SIL Open Font License 1.1. https://fonts.google.com/specimen/DM+Mono (fonts/OFL-DMMono.txt)
+
+Code:
+- engine.js is adapted from the Pictogram Motion engine of the Lemo-Opuscar library (MIT licence), https://github.com/lemomo-ai/lemo-opuscar
+- Foley helpers (click, step, whoosh, thump, pop, limit) from the same library's core/audio/sfx.py (MIT licence).

@@ -1,0 +1,26 @@
+<!doctype html>
+<html><head><meta charset="utf-8">
+<style>
+@font-face { font-family: "Inter Tight"; src: url(fonts/InterTight-900.woff2); font-weight: 900; }
+@font-face { font-family: "Inter Tight"; src: url(fonts/InterTight-700.woff2); font-weight: 700 800; }
+@font-face { font-family: "DM Mono"; src: url(fonts/DMMono-500.woff2); font-weight: 500; }
+html,body { margin:0; background:#fff; overflow:hidden; }
+canvas { display:block; width:1080px; height:1920px; }
+</style></head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<script src="timeline.js"></script>
+<script src="engine.js"></script>
+<script src="poses.js"></script>
+<script src="scenes.js"></script>
+<script>
+const ctx = document.getElementById('c').getContext('2d');
+const scratch = G.canvas().getContext('2d');
+window.DUR = TL.dur;
+window.EV = TL.EV;
+window.render = (t) => G.renderFrame(ctx, t);
+window.TEXTS = (t) => G.textsAt(scratch, t);
+Promise.all(['900 40px "Inter Tight"', '800 40px "Inter Tight"', '500 30px "DM Mono"']
+  .map((f) => document.fonts.load(f, 'AaÀ@·→'))).then(() => { render(0); window.READY = true; });
+</script>
+</body></html>
