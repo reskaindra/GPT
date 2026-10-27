@@ -1,0 +1,965 @@
+<!doctype html>
+<html lang="id">
+<head>
+<meta charset="utf-8">
+<title>Berkas IGD: Nyeri Perut</title>
+<link rel="stylesheet" href="fonts.css">
+<style>
+  html, body { margin: 0; width: 1080px; height: 1920px; overflow: hidden; background: #F3EBDC; }
+  svg, canvas { position: absolute; left: 0; top: 0; width: 1080px; height: 1920px; }
+  #paper { mix-blend-mode: multiply; pointer-events: none; }
+  #fx { pointer-events: none; }
+  .mul { mix-blend-mode: multiply; }
+</style>
+</head>
+<body>
+<svg id="stage" viewBox="0 0 1080 1920" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <filter id="boil" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence id="boilT" type="fractalNoise" baseFrequency="0.022" numOctaves="2" seed="1" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="4" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.75" numOctaves="2" seed="4" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -22 15.2" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <filter id="stampInk" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="11" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="7" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="21" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -9 5.9" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <filter id="stampInk2" x="-10%" y="-10%" width="120%" height="120%">
+      <feTurbulence type="fractalNoise" baseFrequency="0.04" numOctaves="3" seed="11" result="w"/>
+      <feDisplacementMap in="SourceGraphic" in2="w" scale="5" xChannelSelector="R" yChannelSelector="G" result="d"/>
+      <feTurbulence type="fractalNoise" baseFrequency="0.55" numOctaves="3" seed="21" result="g"/>
+      <feColorMatrix in="g" type="matrix" values="0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 -9 7.2" result="gm"/>
+      <feComposite in="d" in2="gm" operator="in"/>
+    </filter>
+    <clipPath id="frameClip"><rect width="1080" height="1920"/></clipPath>
+  </defs>
+  <g clip-path="url(#frameClip)">
+    <g id="cam"><g id="world"></g></g>
+    <g id="hud"></g>
+    <g id="wipe"></g>
+    <rect id="flash" width="1080" height="1920" fill="#FFFFFF" opacity="0"/>
+    <rect id="fade" width="1080" height="1920" fill="#1B2440" opacity="0"/>
+  </g>
+</svg>
+<canvas id="paper" width="1080" height="1920"></canvas>
+<canvas id="fx" width="1080" height="1920"></canvas>
+
+<script>
+// ============================================================
+// Berkas IGD: Nyeri Perut · Halftone Dossier, 1080×1920, 30 fps
+// Engine adapted from the Lemo-Opuscar halftone-dossier demo (MIT)
+// ============================================================
+const NS = 'http://www.w3.org/2000/svg';
+const W = 1080, H = 1920, FPS = 30, DUR = 74;
+const C = {
+  paper: '#F3EBDC', navy: '#1B2440', teal: '#1F8A84', mustard: '#F2B632', red: '#E0452B',
+  card: '#FFF9EE', night: '#18203A', night2: '#2B3962', screen: '#0F1528',
+};
+const F = {
+  slab: "'Alfa Slab One'", bagel: "'Bagel Fat One'", hand: "'Caveat Brush'",
+  mono: "'JetBrains Mono'", black: "'Archivo Black'", body: "'Archivo'",
+};
+// sections: [start, end, chip, title, dark]
+const SEC = [
+  [0, 6.5, 'BUKTI 00', 'Resep'],
+  [6.5, 12, 'BUKTI 01', 'Pasien'],
+  [12, 18, 'BUKTI 02', 'Triase'],
+  [18, 23, 'BUKTI 03', 'Godaan'],
+  [23, 30.5, 'BUKTI 04', 'Satu kalimat'],
+  [30.5, 38, 'BUKTI 05', 'Monitor', true],
+  [38, 46, 'BUKTI 06', 'Hasil'],
+  [46, 56.5, 'CATATAN', 'Kenapa?'],
+  [56.5, 65.5, 'PUTUSAN', 'Cek 3 hal'],
+  [65.5, 74, 'DITUTUP', 'Kamar operasi'],
+];
+
+// ---------- helpers ----------
+function el(tag, attrs = {}, parent) {
+  const e = document.createElementNS(NS, tag);
+  for (const k in attrs) e.setAttribute(k, attrs[k]);
+  if (parent) parent.appendChild(e);
+  return e;
+}
+function txt(parent, str, attrs) { const e = el('text', attrs, parent); e.textContent = str; return e; }
+function tf(e, x = 0, y = 0, s = 1, r = 0, sy) {
+  e.setAttribute('transform', `translate(${x.toFixed(2)} ${y.toFixed(2)}) rotate(${r.toFixed(2)}) scale(${s.toFixed(4)} ${(sy ?? s).toFixed(4)})`);
+}
+function op(e, o) { e.setAttribute('opacity', Math.max(0, Math.min(1, o)).toFixed(3)); }
+function show(e, v) { e.style.display = v ? '' : 'none'; }
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const seg = (t, a, b) => clamp((t - a) / (b - a));
+const lerp = (a, b, p) => a + (b - a) * p;
+const E = {
+  out: p => 1 - Math.pow(1 - p, 3),
+  in: p => p * p * p,
+  io: p => p < .5 ? 4 * p * p * p : 1 - Math.pow(-2 * p + 2, 3) / 2,
+  back: p => { const c = 1.9; return 1 + (c + 1) * Math.pow(p - 1, 3) + c * Math.pow(p - 1, 2); },
+};
+const pop = (t, t0, d = 0.35) => t < t0 ? 0 : E.back(seg(t, t0, t0 + d));
+function rng(seed) { return () => { seed |= 0; seed = seed + 0x6D2B79F5 | 0; let t = Math.imul(seed ^ seed >>> 15, 1 | seed); t = t + Math.imul(t ^ t >>> 7, 61 | t) ^ t; return ((t ^ t >>> 14) >>> 0) / 4294967296; }; }
+const mctx = document.createElement('canvas').getContext('2d');
+function measure(str, size, family, weight = 400) { mctx.font = `${weight} ${size}px ${family}`; return mctx.measureText(str).width; }
+function wrap(str, size, family, weight, maxW) {
+  const words = str.split(' '); const lines = []; let cur = '';
+  for (const w of words) {
+    const t = cur ? cur + ' ' + w : w;
+    if (cur && measure(t, size, family, weight) > maxW) { lines.push(cur); cur = w; } else cur = t;
+  }
+  if (cur) lines.push(cur);
+  return lines;
+}
+
+// ---------- sound events + readable texts ----------
+const EV = [];
+const ev = (t, type, extra = {}) => EV.push({ t: +t.toFixed(3), type, ...extra });
+const TXT = [];
+// every piece of copy registers itself with its visible window, for readcheck
+function reg(id, text, node, t0, t1) { TXT.push({ id, text, node, t0, t1 }); }
+
+// ---------- per-character headline (wraps, pops glyph by glyph) ----------
+function headline(parent, str, o) {
+  const { x = 72, y, size = 86, family = F.slab, weight = 400, fill = C.navy, maxW = 930, lh = size * 1.12, shadow = { fill: C.mustard, dx: 6, dy: 6 }, anchor = 'start' } = o;
+  const g = el('g', {}, parent);
+  const lines = wrap(str, size, family, weight, maxW);
+  const items = [];
+  lines.forEach((ln, li) => {
+    const arr = [...ln];
+    const widths = arr.map(c => measure(c, size, family, weight));
+    const total = measure(ln, size, family, weight);
+    const k = total / widths.reduce((a, b) => a + b, 0);
+    let cx = anchor === 'middle' ? x - total / 2 : x;
+    arr.forEach((ch, i) => {
+      const cw = widths[i] * k;
+      if (ch !== ' ') {
+        const cg = el('g', {}, g);
+        const base = { x: 0, y: 0, 'font-size': size, 'font-family': family, 'font-weight': weight, 'text-anchor': 'middle' };
+        if (shadow) txt(cg, ch, { ...base, x: shadow.dx, y: shadow.dy, fill: shadow.fill, class: shadow.mul === false ? '' : 'mul' });
+        txt(cg, ch, { ...base, fill });
+        items.push({ g: cg, x: cx + cw / 2, y: y + li * lh, size });
+      }
+      cx += cw;
+    });
+  });
+  return { g, items, lines, h: lines.length * lh };
+}
+function charsPop(c, t, t0, stagger = 0.025, d = 0.36, from = 50) {
+  c.items.forEach((it, i) => {
+    const s = t0 + i * stagger;
+    if (t < s) { op(it.g, 0); return; }
+    const p = seg(t, s, s + d);
+    const h = it.size * 0.35;
+    op(it.g, 1);
+    const sc = E.back(p);
+    const sq = 1 + 0.25 * Math.sin(p * Math.PI) * (1 - p);
+    it.g.setAttribute('transform', `translate(${it.x} ${it.y + from * (1 - E.out(p))}) translate(0 ${-h}) scale(${(sc / sq).toFixed(3)} ${(sc * sq).toFixed(3)}) translate(0 ${h})`);
+  });
+}
+// ---------- body copy: wrapped lines that rise in one by one ----------
+function body(parent, str, o) {
+  const { x = 0, y = 0, size = 54, family = F.body, weight = 800, fill = C.navy, maxW = 800, lh = size * 1.22, anchor = 'start' } = o;
+  const g = el('g', {}, parent);
+  const lines = wrap(str, size, family, weight, maxW).map((ln, i) => {
+    const lg = el('g', {}, g);
+    txt(lg, ln, { x: 0, y: 0, 'font-size': size, 'font-family': family, 'font-weight': weight, fill, 'text-anchor': anchor });
+    return { g: lg, x, y: y + i * lh };
+  });
+  return { g, lines, h: lines.length * lh };
+}
+function bodyAnim(b, t, t0, stagger = 0.12) {
+  b.lines.forEach((l, i) => {
+    const s = t0 + i * stagger;
+    if (t < s) { op(l.g, 0); return; }
+    op(l.g, 1);
+    const p = seg(t, s, s + 0.35);
+    tf(l.g, l.x, l.y + 34 * (1 - E.back(p)), lerp(0.92, 1, E.out(p)));
+  });
+}
+
+// ---------- halftone ----------
+function halftone(parent, { x0 = 0, y0 = 0, w = W, h = H, step = 22, angle = 15, color, f, maxK = 0.64 }) {
+  const a = angle * Math.PI / 180, ca = Math.cos(a), sa = Math.sin(a);
+  const n = Math.ceil(Math.hypot(w, h) / step / 2) + 2;
+  let d = '';
+  for (let i = -n; i <= n; i++) for (let j = -n; j <= n; j++) {
+    const u = i * step, v = j * step;
+    const x = x0 + w / 2 + u * ca - v * sa, y = y0 + h / 2 + u * sa + v * ca;
+    if (x < x0 - step || x > x0 + w + step || y < y0 - step || y > y0 + h + step) continue;
+    const s = clamp(f(x, y)); if (s < 0.05) continue;
+    const r = s * step * maxK;
+    d += `M${(x - r).toFixed(1)} ${y.toFixed(1)}a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(2 * r).toFixed(1)} 0a${r.toFixed(1)} ${r.toFixed(1)} 0 1 0 ${(-2 * r).toFixed(1)} 0`;
+  }
+  return el('path', { d, fill: color }, parent);
+}
+const radial = (cx, cy, R, pw = 1.2) => (x, y) => Math.pow(clamp(1 - Math.hypot(x - cx, y - cy) / R), pw);
+const edge = (R = 1000, pw = 1.6, k = 1.3) => (x, y) => Math.pow(clamp(Math.hypot((x - 540) * 1.6, y - 960) / R - 0.35), pw) * k;
+const ramp = (y0, y1) => (x, y) => seg(y, y0, y1);
+const mul = e => { e.setAttribute('class', 'mul'); return e; };
+function bg(parent, color) { return el('rect', { width: W, height: H, fill: color }, parent); }
+
+// giant numeral filled with halftone (unique clip id per numeral)
+let clipN = 0;
+function bigNum(parent, str, { x, y, size, fill, dots, anchor = 'start' }) {
+  const g = el('g', {}, parent);
+  const id = 'nclip' + (clipN++);
+  const cp = el('clipPath', { id }, g);
+  const attrs = { x, y, 'font-size': size, 'font-family': F.bagel, 'text-anchor': anchor };
+  txt(cp, str, attrs);
+  txt(g, str, { ...attrs, fill });
+  const w = measure(str, size, F.bagel);
+  const x0 = anchor === 'middle' ? x - w / 2 : x;
+  const hg = el('g', { 'clip-path': `url(#${id})` }, g);
+  mul(halftone(hg, { x0: x0 - 20, y0: y - size, w: w + 40, h: size * 1.1, step: 20, angle: 45, color: dots, f: (px, py) => 0.25 + 0.75 * seg(py, y - size, y), maxK: 0.62 }));
+  return g;
+}
+
+// ---------- caption bar (wraps; keyword between *stars* in mustard) ----------
+function caption(parent, str, { x = 540, y = 1400, size = 46, maxW = 880, dark = false } = {}) {
+  const g = el('g', {}, parent);
+  const inner = el('g', {}, g);
+  const toks = str.split(' ').map(w => ({ w: w.replace(/\*/g, ''), raw: w }));
+  // highlight state per token
+  let on = false;
+  toks.forEach(tk => {
+    const starts = tk.raw.startsWith('*'), ends = tk.raw.replace(/[^*]/g, '').length;
+    if (starts) on = true;
+    tk.hi = on;
+    if (starts ? ends >= 2 : ends >= 1) on = false;
+    tk.tail = '';
+    const m = tk.raw.match(/\*([^*]*)$/);
+    if (tk.hi && m && !starts) { tk.tail = m[1]; tk.w = tk.raw.split('*')[0]; }
+    else if (starts && ends >= 2) { const p = tk.raw.split('*'); tk.w = p[1]; tk.tail = p[2] || ''; }
+  });
+  const lines = []; let cur = []; let cw = 0;
+  const sw = measure(' ', size, F.black);
+  toks.forEach(tk => {
+    const ww = measure(tk.w + tk.tail, size, F.black);
+    if (cur.length && cw + sw + ww > maxW) { lines.push({ toks: cur, w: cw }); cur = []; cw = 0; }
+    cw += (cur.length ? sw : 0) + ww; cur.push(tk);
+  });
+  if (cur.length) lines.push({ toks: cur, w: cw });
+  const lh = size * 1.3, padX = 34, padY = 22;
+  const bw = Math.max(...lines.map(l => l.w)) + padX * 2, bh = lines.length * lh + padY * 2 - (lh - size * 1.05);
+  const ink = dark ? C.card : C.navy, txtc = dark ? C.navy : C.card, hic = dark ? C.red : C.mustard;
+  el('rect', { x: -bw / 2 + 8, y: -bh / 2 + 8, width: bw, height: bh, rx: 16, fill: dark ? C.red : C.teal, class: dark ? '' : 'mul' }, inner);
+  el('rect', { x: -bw / 2, y: -bh / 2, width: bw, height: bh, rx: 16, fill: ink }, inner);
+  lines.forEach((l, i) => {
+    const t = el('text', { x: -l.w / 2, y: -bh / 2 + padY + size * 0.82 + i * lh, 'font-size': size, 'font-family': F.black }, inner);
+    l.toks.forEach((tk, j) => {
+      const sp = el('tspan', { fill: tk.hi ? hic : txtc }, t); sp.textContent = (j ? ' ' : '') + tk.w;
+      if (tk.tail) { const s2 = el('tspan', { fill: txtc }, t); s2.textContent = tk.tail; }
+    });
+  });
+  return { g, inner, x, y, text: str.replace(/\*/g, ''), h: bh };
+}
+function captionAnim(c, t, t0, t1 = 1e9) {
+  if (t < t0 || t >= t1) { op(c.g, 0); return; }
+  const p = seg(t, t0, t0 + 0.4);
+  op(c.g, 1);
+  tf(c.g, c.x, c.y + 40 * (1 - E.out(p)), lerp(0.8, 1, E.back(p)), -1.2 * (1 - p) - 0.5);
+}
+
+// ---------- stamp (multi-line) ----------
+function stampEl(parent, lines, { size = 76, color = C.red, family = F.black, padX = 44, padY = 26, border = 11 } = {}) {
+  const g = el('g', {}, parent);
+  const inner = el('g', { filter: 'url(#stampInk2)' }, g);
+  const lh = size * 1.08;
+  const w = Math.max(...lines.map(l => measure(l, size, family))) + padX * 2, h = lines.length * lh + padY * 2;
+  el('rect', { x: -w / 2, y: -h / 2, width: w, height: h, rx: 20, fill: 'none', stroke: color, 'stroke-width': border }, inner);
+  el('rect', { x: -w / 2 + border * 1.8, y: -h / 2 + border * 1.8, width: w - border * 3.6, height: h - border * 3.6, rx: 10, fill: 'none', stroke: color, 'stroke-width': border * 0.35 }, inner);
+  lines.forEach((l, i) => txt(inner, l, { x: 0, y: -h / 2 + padY + size * 0.86 + i * lh, 'font-size': size, 'font-family': family, fill: color, 'text-anchor': 'middle' }));
+  return { g, w, h };
+}
+function stampAnim(s, t, t0, x, y, rot) {
+  if (t < t0 - 0.09) { op(s.g, 0); return; }
+  const p = seg(t, t0 - 0.09, t0);
+  const after = Math.max(0, t - t0);
+  const bounce = 1 + 0.05 * Math.sin(after * 30) * Math.exp(-after * 9);
+  op(s.g, p < 1 ? 0.3 + 0.7 * p : 0.93);
+  tf(s.g, x, y, lerp(2.6, 1, E.in(p)) * bounce, rot);
+}
+
+// ---------- props ----------
+const LW = 6;
+function cardShape(parent, w, h, { fill = C.card, rx = 10, shadow = true } = {}) {
+  if (shadow) el('rect', { x: -w / 2 + 12, y: -h / 2 + 12, width: w, height: h, rx, fill: C.navy, opacity: 0.22 }, parent);
+  return el('rect', { x: -w / 2, y: -h / 2, width: w, height: h, rx, fill, stroke: C.navy, 'stroke-width': LW }, parent);
+}
+// marker stroke drawn on along its length
+function marker(parent, d, { color = C.red, width = 14 } = {}) {
+  const p = el('path', { d, fill: 'none', stroke: color, 'stroke-width': width, 'stroke-linecap': 'round', 'stroke-linejoin': 'round', class: 'mul' }, parent);
+  return p;
+}
+function drawOn(p, t, t0, t1) {
+  const L = p.__len || (p.__len = p.getTotalLength());
+  p.setAttribute('stroke-dasharray', `${L} ${L}`);
+  p.setAttribute('stroke-dashoffset', (L * (1 - E.io(seg(t, t0, t1)))).toFixed(1));
+  op(p, t >= t0 ? 1 : 0);
+}
+// the prescription slip (Beat 1, 4 and 10)
+function resep(parent, { cross = true } = {}) {
+  const g = el('g', {}, parent);
+  const paperG = el('g', { filter: 'url(#boil)' }, g);
+  cardShape(paperG, 760, 470, { fill: '#FFFDF6' });
+  el('line', { x1: -340, y1: -130, x2: 340, y2: -130, stroke: C.navy, 'stroke-width': 4 }, paperG);
+  txt(g, 'RESEP', { x: -340, y: -160, 'font-size': 40, 'font-family': F.mono, 'font-weight': 800, fill: C.navy, 'letter-spacing': 6 });
+  txt(g, 'IGD · JAGA MALAM', { x: 340, y: -160, 'font-size': 24, 'font-family': F.mono, 'font-weight': 800, fill: C.teal, 'text-anchor': 'end' });
+  const l1 = txt(g, 'R/ Antasida', { x: -310, y: -40, 'font-size': 78, 'font-family': F.hand, fill: C.navy });
+  const l2 = txt(g, 'R/ Omeprazol', { x: -310, y: 70, 'font-size': 78, 'font-family': F.hand, fill: C.navy });
+  const sig = el('path', { d: 'M 120 170 C 150 120 170 190 200 150 S 250 130 260 170 S 300 150 330 160', fill: 'none', stroke: C.navy, 'stroke-width': 4, 'stroke-linecap': 'round' }, g);
+  el('line', { x1: 100, y1: 190, x2: 340, y2: 190, stroke: C.navy, 'stroke-width': 3, 'stroke-dasharray': '8 8' }, g);
+  const res = { g, l1, l2, sig };
+  if (cross) {
+    res.x1 = marker(g, 'M -330 -110 C -150 -20 120 80 330 190', { width: 16 });
+    res.x2 = marker(g, 'M 320 -120 C 140 -20 -120 90 -320 185', { width: 16 });
+  }
+  return res;
+}
+// left-to-right reveal of a group (handwriting); returns setter
+function writeOn(parent, node, x0, x1, y0, y1) {
+  const id = 'wclip' + (clipN++);
+  const cp = el('clipPath', { id }, parent);
+  const r = el('rect', { x: x0, y: y0, width: 0, height: y1 - y0 }, cp);
+  node.setAttribute('clip-path', `url(#${id})`);
+  return p => r.setAttribute('width', ((x1 - x0) * clamp(p)).toFixed(1));
+}
+function bubble(parent, str, { w = 900, size = 60, tail = 'left' } = {}) {
+  const g = el('g', {}, parent);
+  const lines = wrap(str, size, F.body, 800, w - 110);
+  const lh = size * 1.2, h = lines.length * lh + 90;
+  const shape = el('g', { filter: 'url(#boil)' }, g);
+  const tx = tail === 'left' ? -w / 2 + 120 : w / 2 - 160;
+  el('rect', { x: -w / 2 + 12, y: -h / 2 + 12, width: w, height: h, rx: 40, fill: C.navy }, shape);
+  el('path', { d: `M ${tx} ${h / 2 - 8} L ${tx - 50} ${h / 2 + 90} L ${tx + 70} ${h / 2 - 8} Z`, fill: '#FFFDF6', stroke: C.navy, 'stroke-width': LW, 'stroke-linejoin': 'round' }, shape);
+  el('rect', { x: -w / 2, y: -h / 2, width: w, height: h, rx: 40, fill: '#FFFDF6', stroke: C.navy, 'stroke-width': LW }, shape);
+  el('rect', { x: tx - 4, y: h / 2 - 14, width: 76, height: 18, fill: '#FFFDF6' }, shape);
+  lines.forEach((ln, i) => txt(g, ln, { x: -w / 2 + 55, y: -h / 2 + 45 + size * 0.85 + i * lh, 'font-size': size, 'font-family': F.body, 'font-weight': 800, fill: C.navy }));
+  return { g, h };
+}
+function bubbleAnim(b, t, t0, x, y, rot = -1) {
+  if (t < t0) { op(b.g, 0); return; }
+  op(b.g, 1);
+  const p = pop(t, t0, 0.4);
+  tf(b.g, x, y + 20 * (1 - p), p, rot);
+}
+function slideIn(g, t, t0, x, y, rot, { from = 1200, d = 0.45, dir = 'y' } = {}) {
+  if (t < t0) { op(g, 0); return 0; }
+  op(g, 1);
+  const p = E.back(seg(t, t0, t0 + d));
+  const r = rot + (1 - p) * 14;
+  if (dir === 'y') tf(g, x, lerp(y + from, y, p), 1, r); else tf(g, lerp(x + from, x, p), y, 1, r);
+  return p;
+}
+function chip(parent, str, { x, y, size = 26, fill = C.navy, color = C.card }) {
+  const g = el('g', {}, parent);
+  const w = measure(str, size, F.mono, 800) + 28;
+  el('rect', { x, y: y - size - 8, width: w, height: size + 22, rx: 6, fill }, g);
+  txt(g, str, { x: x + 14, y: y + 2, 'font-size': size, 'font-family': F.mono, 'font-weight': 800, fill: color });
+  return g;
+}
+
+// ============================================================
+// stage
+// ============================================================
+const world = document.getElementById('world');
+const cam = document.getElementById('cam');
+const hud = document.getElementById('hud');
+const wipe = document.getElementById('wipe');
+const flash = document.getElementById('flash');
+const fade = document.getElementById('fade');
+const scenes = [];
+function scene(t0, t1, build) {
+  const g = el('g', {}, world);
+  const s = { g, t0, t1, cam: null };
+  s.update = build(g, s);
+  scenes.push(s);
+  return s;
+}
+const SHAKES = [];   // [t0, amp, dur]
+const FLASH = [];    // [t0, peak, dur]
+let camFn = () => ({ z: 1, cx: 540, cy: 960, px: 0, py: 0 });
+
+function buildAll() {
+  // ---------------- 1 · Hook 0–6.5 ----------------
+  scene(0, 6.5, (g, s) => {
+    bg(g, C.paper);
+    mul(halftone(g, { color: C.mustard, step: 24, angle: 15, f: radial(1000, 300, 820, 1.1), maxK: 0.66 }));
+    mul(halftone(g, { color: C.teal, step: 24, angle: 70, f: radial(0, 1900, 700, 1.3), maxK: 0.6 }));
+    const alarm = mul(halftone(g, { color: C.red, step: 26, angle: 30, f: edge(980, 1.4, 1.5), maxK: 0.7 }));
+    const h = headline(g, 'Jaga IGD, ketemu perempuan usia produktif nyeri perut?', { y: 380, size: 88 });
+    reg('h1', 'Jaga IGD, ketemu perempuan usia produktif nyeri perut?', h.g, 0.15, 6.5);
+    const rs = resep(el('g', {}, g));
+    const cap = caption(g, 'Cek *3 hal* ini sebelum meresepkan obat maag.', { y: 1400 });
+    reg('c1', cap.text, cap.g, 2.0, 6.5);
+    ev(0.0, 'hit'); ev(0.55, 'paper'); ev(2.0, 'marker', { d: 0.3 }); ev(2.0, 'alarm'); ev(2.0, 'shutter'); ev(2.35, 'marker', { d: 0.25 });
+    SHAKES.push([2.0, 16, 0.35]); FLASH.push([2.0, 0.5, 0.25]);
+    s.cam = t => ({ z: lerp(1, 1.05, seg(t, 0, 6.5)), cx: 540, cy: 320 });
+    return t => {
+      charsPop(h, t, 0.15, 0.022);
+      slideIn(rs.g, t, 0.55, 540, 1000, -3);
+      drawOn(rs.x1, t, 2.0, 2.3); drawOn(rs.x2, t, 2.3, 2.55);
+      // red blink: on at 2.0, off, on once more
+      const blink = (t >= 2.0 && t < 2.25) || (t >= 2.45 && t < 2.7);
+      op(alarm, blink ? 1 : 0);
+      captionAnim(cap, t, 2.0);
+    };
+  });
+
+  // ---------------- 2 · Setup 6.5–12 ----------------
+  scene(6.5, 12, (g, s) => {
+    bg(g, C.paper);
+    mul(halftone(g, { color: C.teal, step: 24, angle: 20, f: radial(0, 1700, 800, 1.2), maxK: 0.62 }));
+    const num = bigNum(g, '01', { x: 1060, y: 640, size: 460, fill: C.mustard, dots: C.navy, anchor: 'end' });
+    const lab = chip(g, 'BARANG BUKTI 01 · PASIEN', { x: 72, y: 330 });
+    const card = el('g', {}, g);
+    const cardInner = el('g', { filter: 'url(#boil)' }, card);
+    cardShape(cardInner, 940, 700);
+    for (let i = 0; i < 7; i++) el('line', { x1: -440, y1: -170 + i * 86, x2: 440, y2: -170 + i * 86, stroke: C.teal, 'stroke-width': 2, opacity: 0.45 }, cardInner);
+    el('line', { x1: -440, y1: -250, x2: 440, y2: -250, stroke: C.red, 'stroke-width': 4 }, cardInner);
+    const t1 = headline(card, 'Perempuan, 26 tahun.', { x: -420, y: -280, size: 74, shadow: { fill: C.mustard, dx: 5, dy: 5 } });
+    const b1 = body(card, 'Nyeri perut bawah sudah dari kemarin.', { x: -420, y: -130, size: 56, maxW: 840 });
+    txt(card, 'KB:', { x: -420, y: 190, 'font-size': 48, 'font-family': F.mono, 'font-weight': 800, fill: C.navy });
+    const kb = txt(card, 'pil', { x: -300, y: 200, 'font-size': 110, 'font-family': F.hand, fill: C.navy });
+    const setKb = writeOn(card, kb, -310, -140, 80, 240);
+    const ring = marker(card, 'M -180 120 C -260 100 -330 150 -320 200 C -305 255 -200 260 -150 220 C -110 185 -130 120 -210 115', { width: 10 });
+    const cap = caption(g, 'Baris ini nanti jadi *masalah*.', { y: 1420 });
+    reg('t2a', 'Perempuan, 26 tahun.', t1.g, 6.8, 12);
+    reg('t2b', 'Nyeri perut bawah sudah dari kemarin.', b1.g, 7.4, 12);
+    reg('t2c', 'KB: pil', kb, 8.3, 12);
+    reg('c2', cap.text, cap.g, 8.8, 12);
+    ev(6.6, 'paper'); ev(8.3, 'pen', { d: 0.4 }); ev(8.8, 'marker', { d: 0.4 });
+    s.cam = t => ({ z: lerp(1.0, 1.04, seg(t, 6.5, 12)), cx: 540, cy: 320 });
+    return t => {
+      tf(num, 0, 40 * (1 - E.back(seg(t, 6.5, 6.9))));
+      op(num, t >= 6.5 ? 1 : 0);
+      op(lab, t >= 6.6 ? 1 : 0); tf(lab, -300 * (1 - E.out(seg(t, 6.6, 6.9))), 0);
+      slideIn(card, t, 6.5, 540, 1000, -1.5, { from: 1000, d: 0.4 });
+      charsPop(t1, t, 6.8, 0.03);
+      bodyAnim(b1, t, 7.4);
+      setKb(seg(t, 8.3, 8.7)); op(kb, t >= 8.3 ? 1 : 0);
+      drawOn(ring, t, 8.8, 9.2);
+      captionAnim(cap, t, 8.8);
+    };
+  });
+
+  // ---------------- 3 · False calm 12–18 ----------------
+  scene(12, 18, (g, s) => {
+    bg(g, C.paper);
+    mul(halftone(g, { color: C.teal, step: 24, angle: 15, f: radial(980, 260, 760, 1.2), maxK: 0.6 }));
+    const h = headline(g, 'Semua kelihatan stabil.', { y: 400, size: 90 });
+    reg('h3', 'Semua kelihatan stabil.', h.g, 12.3, 18);
+    const sheet = el('g', {}, g);
+    const sIn = el('g', { filter: 'url(#boil)' }, sheet);
+    cardShape(sIn, 940, 470, { fill: '#FFFDF6' });
+    el('rect', { x: -470, y: -235, width: 940, height: 74, fill: C.navy }, sIn);
+    txt(sheet, 'LEMBAR TRIASE', { x: -440, y: -184, 'font-size': 34, 'font-family': F.mono, 'font-weight': 800, fill: C.card, 'letter-spacing': 4 });
+    el('line', { x1: 0, y1: -150, x2: 0, y2: 225, stroke: C.navy, 'stroke-width': 3, opacity: 0.5 }, sheet);
+    el('line', { x1: -460, y1: 40, x2: 460, y2: 40, stroke: C.navy, 'stroke-width': 3, opacity: 0.5 }, sheet);
+    const rows = [['TD', '114/76', 'mmHg'], ['NADI', '94', 'x/mnt'], ['NAPAS', '18', 'x/mnt'], ['SUHU', '36,8', '°C']];
+    const cells = rows.map((r, i) => {
+      const cg = el('g', {}, sheet);
+      const cx = i % 2 ? 30 : -440, cy = i < 2 ? -105 : 85;
+      txt(cg, r[0], { x: cx, y: cy, 'font-size': 30, 'font-family': F.mono, 'font-weight': 800, fill: C.navy });
+      txt(cg, r[1], { x: cx, y: cy + 100, 'font-size': 96, 'font-family': F.bagel, fill: C.teal });
+      txt(cg, r[2], { x: cx + measure(r[1], 96, F.bagel) + 14, y: cy + 100, 'font-size': 26, 'font-family': F.mono, 'font-weight': 800, fill: C.navy });
+      reg('v3' + i, `${r[0]} ${r[1]} ${r[2]}`, cg, 12.9 + i * 0.2, 18);
+      return cg;
+    });
+    const si = el('g', {}, g);
+    const siIn = el('g', { filter: 'url(#boil)' }, si);
+    cardShape(siIn, 560, 300, { fill: C.card });
+    txt(si, 'SHOCK INDEX', { x: -250, y: -90, 'font-size': 30, 'font-family': F.mono, 'font-weight': 800, fill: C.navy, 'letter-spacing': 3 });
+    bigNum(si, '0,82', { x: -255, y: 60, size: 150, fill: C.teal, dots: C.navy });
+    txt(si, 'nadi ÷ sistolik = 94 ÷ 114', { x: -250, y: 115, 'font-size': 25, 'font-family': F.mono, 'font-weight': 800, fill: C.navy });
+    reg('v3si', 'SHOCK INDEX 0,82', si, 14.8, 18);
+    const cap = caption(g, 'Perutnya nyeri tekan, tapi *lemas*.', { y: 1430 });
+    reg('c3', cap.text, cap.g, 14.4, 18);
+    ev(12.3, 'pops', { d: 0.6 }); ev(12.6, 'paper');
+    rows.forEach((r, i) => ev(12.9 + i * 0.2, 'tick'));
+    ev(14.4, 'whoosh'); ev(14.8, 'thump');
+    s.cam = t => {
+      const z = lerp(1, 1.06, E.io(seg(t, 14.8, 15.5)));
+      return { z, cx: 620, cy: 320 };
+    };
+    return t => {
+      charsPop(h, t, 12.3, 0.03);
+      slideIn(sheet, t, 12.6, 540, 780, 1, { from: 1100 });
+      cells.forEach((c, i) => { const s0 = 12.9 + i * 0.2; op(c, t >= s0 ? 1 : 0); tf(c, 0, 30 * (1 - E.back(seg(t, s0, s0 + 0.3)))); });
+      if (t >= 14.8) { op(si, 1); const p = pop(t, 14.8, 0.35); tf(si, 640, 1160, p, 2.5); } else op(si, 0);
+      captionAnim(cap, t, 14.4);
+    };
+  });
+
+  // ---------------- 4 · Temptation 18–23 ----------------
+  scene(18, 23, (g, s) => {
+    bg(g, C.paper);
+    mul(halftone(g, { color: C.mustard, step: 24, angle: 25, f: radial(80, 400, 760, 1.2), maxK: 0.64 }));
+    const bub = bubble(g, 'Maag kayaknya, Dok. Kasih obat terus pulang aja ya?', { w: 930, size: 62 });
+    reg('b4', 'Maag kayaknya, Dok. Kasih obat terus pulang aja ya?', bub.g, 18.3, 23);
+    const rs = resep(el('g', {}, g), { cross: false });
+    const set1 = writeOn(rs.g, rs.l1, -320, 120, -120, 20);
+    const set2 = writeOn(rs.g, rs.l2, -320, 160, -10, 110);
+    op(rs.sig, 0);
+    const pen = el('g', {}, rs.g);
+    const penIn = el('g', { filter: 'url(#boil)', transform: 'rotate(35)' }, pen);
+    el('rect', { x: -14, y: -230, width: 28, height: 200, rx: 8, fill: C.teal, stroke: C.navy, 'stroke-width': 5 }, penIn);
+    el('path', { d: 'M -14 -30 L 14 -30 L 0 0 Z', fill: C.card, stroke: C.navy, 'stroke-width': 5, 'stroke-linejoin': 'round' }, penIn);
+    el('rect', { x: -16, y: -250, width: 32, height: 40, rx: 6, fill: C.red, stroke: C.navy, 'stroke-width': 5 }, penIn);
+    const cap = caption(g, 'Resepnya sudah *setengah* aku tulis.', { y: 1450 });
+    reg('c4', cap.text, cap.g, 19.3, 23);
+    ev(18.3, 'bubble'); ev(19.0, 'paper'); ev(19.6, 'pen', { d: 0.8 }); ev(20.6, 'pen', { d: 0.5 });
+    s.cam = t => ({ z: lerp(1, 1.06, E.io(seg(t, 18, 23))), cx: 540, cy: 320 });
+    return t => {
+      bubbleAnim(bub, t, 18.3, 540, 560, -1.2);
+      slideIn(rs.g, t, 19.0, 540, 1090, 2);
+      const p1 = seg(t, 19.6, 20.4), p2 = seg(t, 20.6, 21.1) * 0.5;
+      set1(p1); set2(p2);
+      const px = t < 20.5 ? lerp(-300, 110, p1) : lerp(-300, 160, p2 * 2) * 1;
+      const py = t < 20.5 ? -50 : 60;
+      const wig = Math.sin(t * 40) * 6 * (t > 19.6 && t < 21.1 ? 1 : 0);
+      const lift = t > 21.1 ? -60 * E.out(seg(t, 21.1, 21.4)) : 0;
+      tf(pen, px + (t > 21.1 ? -60 : 0), py + wig + lift, 1, 0);
+      op(pen, t >= 19.4 ? 1 : 0);
+      captionAnim(cap, t, 19.3);
+    };
+  });
+
+  // ---------------- 5 · One sentence 23–30.5 ----------------
+  scene(23, 30.5, (g, s) => {
+    bg(g, C.paper);
+    mul(halftone(g, { color: C.teal, step: 24, angle: 60, f: edge(1100, 1.5, 1.1), maxK: 0.6 }));
+    const h = headline(g, 'Lalu dia bilang satu kalimat.', { y: 400, size: 92 });
+    reg('h5', 'Lalu dia bilang satu kalimat.', h.g, 23.2, 30.5);
+    const bub = bubble(g, 'Bulan ini haidnya cuma flek, Dok.', { w: 900, size: 68, tail: 'right' });
+    reg('b5', 'Bulan ini haidnya cuma flek, Dok.', bub.g, 25.0, 30.5);
+    const frag = el('g', {}, g);
+    const fIn = el('g', { filter: 'url(#boil)' }, frag);
+    el('path', { d: 'M -330 -140 L 330 -140 L 345 -100 L 320 -60 L 340 -10 L 318 40 L 340 140 L -330 140 Z', fill: C.card, stroke: C.navy, 'stroke-width': LW, 'stroke-linejoin': 'round' }, fIn);
+    el('line', { x1: -310, y1: -80, x2: 310, y2: -80, stroke: C.teal, 'stroke-width': 2, opacity: 0.45 }, fIn);
+    el('line', { x1: -310, y1: 30, x2: 310, y2: 30, stroke: C.teal, 'stroke-width': 2, opacity: 0.45 }, fIn);
+    const kbG = el('g', {}, frag);
+    txt(kbG, 'KB:', { x: -300, y: -40, 'font-size': 44, 'font-family': F.mono, 'font-weight': 800, fill: C.navy });
+    txt(kbG, 'pil', { x: -190, y: -30, 'font-size': 96, 'font-family': F.hand, fill: C.navy });
+    el('path', { d: 'M -70 -100 C -140 -120 -210 -80 -205 -40 C -195 5 -100 10 -60 -20 C -30 -45 -50 -95 -120 -100', fill: 'none', stroke: C.red, 'stroke-width': 9, 'stroke-linecap': 'round', class: 'mul' }, frag);
+    const q = txt(frag, 'kadang lupa minum?', { x: -300, y: 105, 'font-size': 76, 'font-family': F.hand, fill: C.navy });
+    const setQ = writeOn(frag, q, -310, 330, 30, 130);
+    const ul = marker(frag, 'M -300 125 C -150 118 50 132 300 120', { width: 8 });
+    reg('t5', 'KB: pil', kbG, 26.0, 30.5);
+    reg('t5q', 'kadang lupa minum?', q, 26.4, 30.5);
+    const cap = caption(g, 'Belum sempat dites, dia minta ke *kamar mandi*.', { y: 1450 });
+    reg('c5', cap.text, cap.g, 26.4, 30.5);
+    ev(23.2, 'pops', { d: 0.8 }); ev(25.0, 'bubble'); ev(26.0, 'paper'); ev(26.4, 'pen', { d: 0.7 }); ev(27.1, 'marker', { d: 0.3 });
+    s.cam = t => ({ z: lerp(1.04, 1, E.io(seg(t, 25, 30.5))), cx: 540, cy: 320 });
+    return t => {
+      charsPop(h, t, 23.2, 0.03);
+      bubbleAnim(bub, t, 25.0, 540, 700, 1);
+      slideIn(frag, t, 26.0, 520, 1110, -3, { from: -900, dir: 'x' });
+      setQ(seg(t, 26.4, 27.1)); op(q, t >= 26.4 ? 1 : 0);
+      drawOn(ul, t, 27.1, 27.4);
+      captionAnim(cap, t, 26.4);
+    };
+  });
+
+  // ---------------- 6 · Escalation (dark) 30.5–38 ----------------
+  scene(30.5, 38, (g, s) => {
+    bg(g, C.night);
+    const d1 = halftone(g, { color: C.night2, step: 24, angle: 20, f: edge(1100, 1.4, 1.0), maxK: 0.62 });
+    const d2 = halftone(g, { color: C.night2, step: 24, angle: 20, f: edge(900, 1.2, 1.4), maxK: 0.68 });
+    const d3 = halftone(g, { color: C.red, step: 26, angle: 50, f: edge(1050, 1.8, 0.8), maxK: 0.42 });
+    const h = headline(g, 'Balik dari kamar mandi, mukanya pucat.', { y: 390, size: 84, fill: C.card, shadow: { fill: C.red, dx: 6, dy: 6, mul: false } });
+    reg('h6', 'Balik dari kamar mandi, mukanya pucat.', h.g, 30.8, 38);
+    const mon = el('g', {}, g);
+    const mIn = el('g', { filter: 'url(#boil)' }, mon);
+    el('rect', { x: -470, y: -230, width: 940, height: 460, rx: 24, fill: C.screen, stroke: C.card, 'stroke-width': LW }, mIn);
+    el('rect', { x: -440, y: -200, width: 880, height: 120, rx: 8, fill: 'none', stroke: C.night2, 'stroke-width': 3 }, mon);
+    const ecg = el('path', { d: '', fill: 'none', stroke: C.mustard, 'stroke-width': 5, 'stroke-linejoin': 'round' }, mon);
+    txt(mon, 'NADI', { x: -430, y: -20, 'font-size': 32, 'font-family': F.mono, 'font-weight': 800, fill: C.card });
+    txt(mon, 'TD', { x: 30, y: -20, 'font-size': 32, 'font-family': F.mono, 'font-weight': 800, fill: C.card });
+    const hr = txt(mon, '108', { x: -430, y: 130, 'font-size': 140, 'font-family': F.bagel, fill: C.red });
+    const bp = txt(mon, '96/60', { x: 30, y: 130, 'font-size': 112, 'font-family': F.bagel, fill: C.card });
+    txt(mon, 'x/mnt', { x: -430, y: 185, 'font-size': 26, 'font-family': F.mono, 'font-weight': 800, fill: C.card, opacity: 0.7 });
+    txt(mon, 'mmHg', { x: 30, y: 185, 'font-size': 26, 'font-family': F.mono, 'font-weight': 800, fill: C.card, opacity: 0.7 });
+    const si = el('g', {}, g);
+    const siIn = el('g', { filter: 'url(#boil)' }, si);
+    cardShape(siIn, 560, 280, { fill: C.card });
+    txt(si, 'SHOCK INDEX', { x: -250, y: -80, 'font-size': 30, 'font-family': F.mono, 'font-weight': 800, fill: C.navy, 'letter-spacing': 3 });
+    bigNum(si, '1,50', { x: -255, y: 65, size: 150, fill: C.red, dots: C.navy });
+    txt(si, '126 ÷ 84', { x: 250, y: 110, 'font-size': 28, 'font-family': F.mono, 'font-weight': 800, fill: C.navy, 'text-anchor': 'end' });
+    reg('v6si', 'SHOCK INDEX 1,50 126 ÷ 84', si, 34.8, 38);
+    const cap = caption(g, 'Test pack tadi masih di *meja*.', { y: 1450, dark: true });
+    reg('c6', cap.text, cap.g, 34.8, 38);
+    // heart rate over time → beeps
+    const HR = t => t < 32.4 ? 108 : t < 34.4 ? Math.round(lerp(108, 126, seg(t, 32.4, 34.4))) : 126;
+    for (let tb = 31.6; tb < 38; tb += 60 / HR(tb) * (tb < 34.4 ? 1 : 0.98)) ev(tb, 'beep');
+    ev(30.8, 'pops', { d: 0.9 }); ev(31.6, 'thump'); ev(34.8, 'alarm'); ev(34.8, 'thump'); ev(35.8, 'alarm'); ev(36.8, 'alarm');
+    SHAKES.push([34.8, 12, 0.3]);
+    s.cam = t => ({ z: lerp(1, 1.06, E.in(seg(t, 31, 38))), cx: 540, cy: 320 });
+    return t => {
+      show(d1, t < 33); show(d2, t >= 33 && t < 34.8); show(d3, t >= 34.8);
+      charsPop(h, t, 30.8, 0.025);
+      slideIn(mon, t, 31.6, 540, 900, 0, { from: 1200 });
+      const v = HR(t);
+      hr.textContent = String(v);
+      const ps = seg(t, 32.4, 34.4);
+      bp.textContent = `${Math.round(lerp(96, 84, ps))}/${Math.round(lerp(60, 52, ps))}`;
+      // ECG: scrolling trace, beat spacing from heart rate
+      let d = ''; const per = 60 / v * 220; const off = (t * 220) % per;
+      for (let x = -430; x <= 430; x += 6) {
+        const u = ((x + 430 + off) % per) / per;
+        let y = -140 + Math.sin(u * 40) * 1.5;
+        if (u > 0.30 && u < 0.34) y -= 50 * Math.sin((u - 0.30) / 0.04 * Math.PI);
+        if (u > 0.34 && u < 0.37) y += 18 * Math.sin((u - 0.34) / 0.03 * Math.PI);
+        if (u > 0.5 && u < 0.62) y -= 9 * Math.sin((u - 0.5) / 0.12 * Math.PI);
+        d += (x === -430 ? 'M' : 'L') + x + ' ' + y.toFixed(1);
+      }
+      ecg.setAttribute('d', d);
+      // red value blinks once alarm starts
+      hr.setAttribute('fill', t > 34.8 && Math.floor(t * 4) % 2 ? C.card : C.red);
+      if (t >= 34.8) { op(si, 1); tf(si, 520, 1235, pop(t, 34.8, 0.35), -2.5); } else op(si, 0);
+      captionAnim(cap, t, 34.8);
+    };
+  });
+
+  // ---------------- 7 · Reveal 38–46 ----------------
+  scene(38, 46, (g, s) => {
+    bg(g, C.paper);
+    mul(halftone(g, { color: C.teal, step: 24, angle: 15, f: radial(1080, 1920, 760, 1.3), maxK: 0.58 }));
+    mul(halftone(g, { color: C.mustard, step: 24, angle: 70, f: radial(0, 300, 560, 1.2), maxK: 0.58 }));
+    const h = headline(g, 'Tes kehamilan: positif.', { y: 380, size: 92 });
+    reg('h7', 'Tes kehamilan: positif.', h.g, 38.3, 46);
+    const tp = el('g', {}, g);
+    const tpIn = el('g', { filter: 'url(#boil)' }, tp);
+    el('rect', { x: -380, y: -62, width: 760, height: 124, rx: 60, fill: '#FFFDF6', stroke: C.navy, 'stroke-width': LW }, tpIn);
+    el('rect', { x: -90, y: -34, width: 230, height: 68, rx: 12, fill: '#F6E6DA', stroke: C.navy, 'stroke-width': 4 }, tpIn);
+    el('rect', { x: -380, y: -62, width: 170, height: 124, rx: 60, fill: C.teal, stroke: C.navy, 'stroke-width': LW }, tpIn);
+    const lc = el('rect', { x: -30, y: -28, width: 16, height: 56, fill: C.red }, tp);
+    const lt = el('rect', { x: 70, y: -28, width: 16, height: 56, fill: C.red }, tp);
+    txt(tp, 'C', { x: -22, y: 92, 'font-size': 26, 'font-family': F.mono, 'font-weight': 800, fill: C.navy, 'text-anchor': 'middle' });
+    txt(tp, 'T', { x: 78, y: 92, 'font-size': 26, 'font-family': F.mono, 'font-weight': 800, fill: C.navy, 'text-anchor': 'middle' });
+    const usgT = headline(g, 'USG: perutnya sudah penuh darah.', { y: 790, size: 60, maxW: 540, shadow: { fill: C.mustard, dx: 4, dy: 4 } });
+    reg('h7b', 'USG: perutnya sudah penuh darah.', usgT.g, 39.8, 46);
+    const usgOuter = el('g', {}, g);
+    const usg = el('g', { transform: 'scale(0.64)' }, usgOuter);
+    const uid = 'usg' + (clipN++);
+    const ucp = el('clipPath', { id: uid }, usg);
+    const fan = 'M 0 -170 L -260 150 A 410 410 0 0 0 260 150 Z';
+    el('path', { d: fan }, ucp);
+    el('path', { d: fan, fill: '#141A2E' }, usg);
+    const ug = el('g', { 'clip-path': `url(#${uid})` }, usg);
+    halftone(ug, { x0: -300, y0: -180, w: 600, h: 420, step: 14, angle: 10, color: '#8D93A6', f: (x, y) => 0.25 + 0.35 * Math.sin(x * 0.05) * Math.cos(y * 0.07) + 0.2, maxK: 0.5 });
+    el('path', { d: 'M -150 40 C -110 -10 -10 10 40 -20 C 110 -50 170 20 150 90 C 120 160 -60 160 -140 120 Z', fill: '#05070D' }, ug);
+    el('path', { d: fan, fill: 'none', stroke: C.navy, 'stroke-width': LW }, usg);
+    const st = stampEl(g, ['KEHAMILAN EKTOPIK', 'TERGANGGU'], { size: 66 });
+    reg('s7', 'KEHAMILAN EKTOPIK TERGANGGU', st.g, 42.0, 46);
+    const sticky = el('g', {}, g);
+    const skIn = el('g', { filter: 'url(#boil)' }, sticky);
+    el('rect', { x: -330 + 10, y: -160 + 10, width: 660, height: 310, fill: C.navy, opacity: 0.22 }, skIn);
+    el('rect', { x: -330, y: -160, width: 660, height: 310, fill: C.mustard, stroke: C.navy, 'stroke-width': LW }, skIn);
+    el('rect', { x: -90, y: -185, width: 180, height: 50, fill: '#E9DFC8', opacity: 0.85, transform: 'rotate(-3)' }, skIn);
+    const items = ['2 jalur infus besar', 'siapkan darah', 'telepon SpOG'].map((s2, i) => {
+      const ig = el('g', {}, sticky);
+      el('rect', { x: -290, y: -128 + i * 98, width: 40, height: 40, rx: 6, fill: 'none', stroke: C.navy, 'stroke-width': 5 }, ig);
+      el('path', { d: `M -284 ${-110 + i * 98} L -272 ${-96 + i * 98} L -252 ${-126 + i * 98}`, fill: 'none', stroke: C.red, 'stroke-width': 7, 'stroke-linecap': 'round', 'stroke-linejoin': 'round' }, ig);
+      txt(ig, s2, { x: -230, y: -92 + i * 98, 'font-size': 64, 'font-family': F.hand, fill: C.navy });
+      reg('k7' + i, s2, ig, 43.0 + i * 0.35, 46);
+      return ig;
+    });
+    ev(38.3, 'pops', { d: 0.7 }); ev(38.4, 'paper'); ev(38.9, 'tick'); ev(39.8, 'pops', { d: 0.8 }); ev(40.2, 'paper');
+    ev(40.0, 'roll', { d: 1.5 }); ev(42.0, 'stamp'); ev(42.0, 'shutter');
+    items.forEach((_, i) => ev(43.0 + i * 0.35, 'pen', { d: 0.25 }));
+    SHAKES.push([42.0, 22, 0.45]); FLASH.push([42.0, 0.5, 0.15]);
+    s.cam = t => ({ z: t < 42 ? lerp(1, 1.05, E.in(seg(t, 39.5, 42))) : lerp(1.05, 1, E.out(seg(t, 42, 43))), cx: 540, cy: 320 });
+    return t => {
+      charsPop(h, t, 38.3, 0.03);
+      slideIn(tp, t, 38.4, 540, 560, -2, { from: -900, dir: 'x' });
+      op(lt, t >= 38.9 ? 1 : 0);
+      tf(lt, 0, 0, 1, 0);
+      charsPop(usgT, t, 39.8, 0.022);
+      slideIn(usgOuter, t, 40.2, 815, 800, 0, { from: 900 });
+      stampAnim(st, t, 42.0, 540, 1100, -5);
+      slideIn(sticky, t, 42.9, 540, 1420, 1.5, { from: 800, d: 0.35 });
+      items.forEach((ig, i) => { const s0 = 43.0 + i * 0.35; op(ig, t >= s0 ? 1 : 0); tf(ig, 30 * (1 - E.back(seg(t, s0, s0 + 0.3))), 0); });
+    };
+  });
+
+  // ---------------- 8 · Core concept 46–56.5 ----------------
+  scene(46, 56.5, (g, s) => {
+    bg(g, C.paper);
+    mul(halftone(g, { color: C.teal, step: 24, angle: 20, f: radial(1080, 1900, 900, 1.2), maxK: 0.6 }));
+    mul(halftone(g, { color: C.mustard, step: 24, angle: 70, f: radial(0, 250, 600, 1.2), maxK: 0.6 }));
+    const h = headline(g, 'Badan perempuan muda jago menutupi perdarahan.', { y: 380, size: 78 });
+    reg('h8', 'Badan perempuan muda jago menutupi perdarahan.', h.g, 47.3, 56.5);
+    const ch = el('g', {}, g);
+    // chart frame: x 100..980, y 720..1150
+    const X0 = 110, X1 = 960, Y0 = 760, Y1 = 1130;
+    el('path', { d: `M ${X0} ${Y0 - 30} L ${X0} ${Y1} L ${X1 + 20} ${Y1}`, fill: 'none', stroke: C.navy, 'stroke-width': 6, 'stroke-linecap': 'round' }, ch);
+    el('path', { d: `M ${X1 + 4} ${Y1 - 14} L ${X1 + 26} ${Y1} L ${X1 + 4} ${Y1 + 14}`, fill: 'none', stroke: C.navy, 'stroke-width': 6, 'stroke-linejoin': 'round' }, ch);
+    const xl = txt(ch, 'perdarahan makin banyak', { x: X1, y: Y1 + 52, 'font-size': 30, 'font-family': F.mono, 'font-weight': 800, fill: C.navy, 'text-anchor': 'end' });
+    reg('x8', 'perdarahan makin banyak', xl, 47.7, 56.5);
+    const px = u => lerp(X0, X1, u), py = v => lerp(Y1, Y0, v);
+    const nadi = u => 0.35 + 0.55 * Math.pow(u, 1.15);
+    const td = u => u < 0.62 ? 0.62 - 0.03 * u : 0.6 - 0.5 * Math.pow((u - 0.62) / 0.38, 1.6);
+    const path = f => { let d = ''; for (let i = 0; i <= 60; i++) { const u = i / 60; d += (i ? 'L' : 'M') + px(u).toFixed(1) + ' ' + py(f(u)).toFixed(1); } return d; };
+    const lN = marker(ch, path(nadi), { color: C.red, width: 12 });
+    const lT = marker(ch, path(td), { color: C.teal, width: 12 });
+    lN.removeAttribute('class'); lT.removeAttribute('class');
+    const labN = txt(ch, 'Nadi', { x: px(0.78), y: py(nadi(0.78)) - 30, 'font-size': 40, 'font-family': F.black, fill: C.red, 'text-anchor': 'end' });
+    const labT = txt(ch, 'Tekanan darah', { x: px(0.31), y: py(td(0.31)) - 26, 'font-size': 40, 'font-family': F.black, fill: C.teal });
+    reg('l8n', 'Nadi', labN, 48.8, 56.5); reg('l8t', 'Tekanan darah', labT, 48.8, 56.5);
+    const drop = marker(ch, `M ${px(0.86) - 70} ${py(0.35)} C ${px(0.86) - 80} ${py(0.05)} ${px(0.86) + 80} ${py(0.0)} ${px(0.86) + 70} ${py(0.3)} C ${px(0.86) + 60} ${py(0.5)} ${px(0.86) - 60} ${py(0.55)} ${px(0.86) - 75} ${py(0.3)}`, { width: 8 });
+    // patient tag at u = 0.28
+    const tag = el('g', {}, g);
+    const tu = 0.28;
+    el('line', { x1: px(tu), y1: Y0 - 10, x2: px(tu), y2: Y1, stroke: C.navy, 'stroke-width': 4, 'stroke-dasharray': '10 10' }, tag);
+    el('circle', { cx: px(tu), cy: py(nadi(tu)), r: 12, fill: C.red, stroke: C.navy, 'stroke-width': 4 }, tag);
+    el('circle', { cx: px(tu), cy: py(td(tu)), r: 12, fill: C.teal, stroke: C.navy, 'stroke-width': 4 }, tag);
+    const tagLab = el('g', {}, tag);
+    const tw = measure('pasien ini di sini', 34, F.black) + 40;
+    el('rect', { x: px(tu) - 30 + 6, y: Y0 - 96 + 6, width: tw, height: 58, rx: 8, fill: C.navy, opacity: 0.25 }, tagLab);
+    el('rect', { x: px(tu) - 30, y: Y0 - 96, width: tw, height: 58, rx: 8, fill: C.mustard, stroke: C.navy, 'stroke-width': 5 }, tagLab);
+    txt(tagLab, 'pasien ini di sini', { x: px(tu) - 10, y: Y0 - 55, 'font-size': 34, 'font-family': F.black, fill: C.navy });
+    reg('g8', 'pasien ini di sini', tagLab, 50.3, 56.5);
+    const foot = txt(g, 'Ilustrasi, bukan skala sebenarnya.', { x: X1 + 20, y: Y1 + 96, 'font-size': 26, 'font-family': F.mono, 'font-weight': 800, fill: C.navy, opacity: 0.75, 'text-anchor': 'end' });
+    reg('f8', 'Ilustrasi, bukan skala sebenarnya.', foot, 48.3, 56.5);
+    const b2 = body(g, 'Tekanan darahnya biasanya turun paling akhir.', { x: 72, y: 1275, size: 50, maxW: 930 });
+    reg('t8', 'Tekanan darahnya biasanya turun paling akhir.', b2.g, 49.6, 56.5);
+    const capA = caption(g, 'Yang bikin aku kepikiran: kenapa tensinya tadi bisa *bagus*?', { y: 1470 });
+    reg('c8a', capA.text, capA.g, 46.3, 52.5);
+    const capB = caption(g, 'Ada *3 hal* yang mestinya aku cek dari awal.', { y: 1470 });
+    reg('c8b', capB.text, capB.g, 52.6, 56.5);
+    ev(46.3, 'whoosh'); ev(47.3, 'pops', { d: 1.0 }); ev(47.8, 'marker', { d: 1.0 }); ev(48.1, 'marker', { d: 1.2 });
+    ev(49.6, 'paper'); ev(50.1, 'marker', { d: 0.4 }); ev(50.3, 'tick'); ev(52.6, 'whoosh');
+    s.cam = t => ({ z: lerp(1.03, 1.0, seg(t, 46, 47.6)), cx: 540, cy: 320, px: lerp(14, -14, E.io(seg(t, 47.6, 54))) });
+    return t => {
+      // the question first, alone and large; then it hands over to the chart
+      captionAnim(capA, t, 46.3, 52.5);
+      charsPop(h, t, 47.3, 0.022);
+      op(ch, t >= 47.7 ? 1 : 0);
+      drawOn(lN, t, 47.8, 48.8); drawOn(lT, t, 48.1, 49.4);
+      op(labN, t >= 48.8 ? 1 : 0); op(labT, t >= 48.8 ? 1 : 0);
+      drawOn(drop, t, 50.1, 50.5);
+      op(foot, t >= 48.3 ? 0.75 : 0);
+      bodyAnim(b2, t, 49.6);
+      op(tag, t >= 50.3 ? 1 : 0);
+      tagLab.setAttribute('transform', `translate(0 ${(-30 * (1 - E.back(seg(t, 50.3, 50.65)))).toFixed(1)})`);
+      captionAnim(capB, t, 52.6);
+    };
+  });
+
+  // ---------------- 9 · Takeaway 56.5–65.5 ----------------
+  scene(56.5, 65.5, (g, s) => {
+    bg(g, C.paper);
+    mul(halftone(g, { color: C.mustard, step: 24, angle: 15, f: radial(1080, 0, 800, 1.1), maxK: 0.64 }));
+    mul(halftone(g, { color: C.teal, step: 24, angle: 70, f: radial(0, 1920, 700, 1.2), maxK: 0.6 }));
+    const h = headline(g, 'Perempuan usia produktif + nyeri perut:', { y: 380, size: 82 });
+    reg('h9', 'Perempuan usia produktif + nyeri perut:', h.g, 56.8, 65.5);
+    const cap = caption(g, 'Tes kehamilan dulu. Apa pun kata *KB*-nya.', { y: 690, size: 50 });
+    reg('c9', cap.text, cap.g, 57.6, 65.5);
+    const sk = el('g', {}, g);
+    const skIn = el('g', { filter: 'url(#boil)' }, sk);
+    el('rect', { x: -440 + 14, y: -330 + 14, width: 880, height: 660, fill: C.navy, opacity: 0.22 }, skIn);
+    el('rect', { x: -440, y: -330, width: 880, height: 660, fill: C.mustard, stroke: C.navy, 'stroke-width': LW }, skIn);
+    el('rect', { x: -110, y: -360, width: 220, height: 60, fill: '#E9DFC8', opacity: 0.85, transform: 'rotate(2)' }, skIn);
+    const title = txt(sk, 'Cek 3 hal ini', { x: -390, y: -220, 'font-size': 70, 'font-family': F.black, fill: C.navy });
+    el('line', { x1: -390, y1: -190, x2: 390, y2: -190, stroke: C.navy, 'stroke-width': 5 }, sk);
+    reg('k9', 'Cek 3 hal ini', title, 59.5, 65.5);
+    const its = ['Tes kehamilan', 'Hitung shock index', 'Cari cairan bebas'].map((s2, i) => {
+      const ig = el('g', {}, sk);
+      bigNum(ig, String(i + 1), { x: -380, y: -60 + i * 160, size: 130, fill: C.red, dots: C.navy });
+      txt(ig, s2, { x: -260, y: -88 + i * 160, 'font-size': 60, 'font-family': F.body, 'font-weight': 800, fill: C.navy });
+      reg('i9' + i, `${i + 1}. ${s2}`, ig, 60.0 + i * 0.6, 65.5);
+      return ig;
+    });
+    ev(56.8, 'pops', { d: 1.0 }); ev(57.6, 'whoosh'); ev(59.3, 'paper'); ev(59.5, 'tick');
+    its.forEach((_, i) => ev(60.0 + i * 0.6, 'bell', { n: i }));
+    s.cam = t => ({ z: lerp(1, 1.03, seg(t, 56.5, 65.5)), cx: 540, cy: 320 });
+    return t => {
+      charsPop(h, t, 56.8, 0.025);
+      captionAnim(cap, t, 57.6);
+      slideIn(sk, t, 59.3, 540, 1180, -1.5, { from: 900 });
+      op(title, t >= 59.5 ? 1 : 0);
+      its.forEach((ig, i) => { const s0 = 60.0 + i * 0.6; op(ig, t >= s0 ? 1 : 0); tf(ig, -40 * (1 - E.back(seg(t, s0, s0 + 0.35))), 0); });
+    };
+  });
+
+  // ---------------- 10 · Close 65.5–74 ----------------
+  scene(65.5, 74, (g, s) => {
+    bg(g, C.paper);
+    mul(halftone(g, { color: C.mustard, step: 24, angle: 15, f: radial(540, 1100, 760, 1.4), maxK: 0.6 }));
+    const h1 = headline(g, 'Yang tadi hampir pulang bawa obat maag,', { y: 380, size: 74 });
+    reg('h10a', 'Yang tadi hampir pulang bawa obat maag,', h1.g, 66.8, 73.4);
+    const h2 = headline(g, 'sekarang sudah di kamar operasi.', { y: 380 + h1.h + 20, size: 74, fill: C.red, shadow: { fill: C.mustard, dx: 5, dy: 5 } });
+    reg('h10b', 'sekarang sudah di kamar operasi.', h2.g, 68.0, 73.4);
+    const rs = resep(el('g', {}, g));
+    const thick = [
+      marker(rs.g, 'M -330 -110 C -150 -20 120 80 330 190', { width: 36 }),
+      marker(rs.g, 'M 320 -120 C 140 -20 -120 90 -320 185', { width: 36 }),
+    ];
+    const cap = caption(g, 'Simpan buat jaga berikutnya.', { y: 1400 });
+    reg('c10', cap.text, cap.g, 70.0, 73.4);
+    const handle = chip(g, '@dokter.emergency', { x: 540 - (measure('@dokter.emergency', 34, F.mono, 800) + 28) / 2, y: 1520, size: 34 });
+    reg('hd10', '@dokter.emergency', handle, 70.4, 73.4);
+    ev(65.6, 'paper'); ev(66.6, 'marker', { d: 0.3 }); ev(66.9, 'marker', { d: 0.3 }); ev(66.8, 'pops', { d: 0.9 }); ev(68.0, 'pops', { d: 0.8 });
+    ev(70.0, 'whoosh'); ev(70.4, 'tick'); ev(72.4, 'tag');
+    s.cam = t => ({ z: lerp(1.05, 1.0, E.io(seg(t, 65.5, 74))), cx: 540, cy: 320 });
+    return t => {
+      slideIn(rs.g, t, 65.6, 540, 1010, -3, { from: 1100 });
+      // the old cross is already there; the new one goes over it, heavier
+      rs.x1.setAttribute('stroke-dasharray', 'none'); op(rs.x1, 1); op(rs.x2, 1);
+      drawOn(thick[0], t, 66.6, 66.9); drawOn(thick[1], t, 66.9, 67.2);
+      charsPop(h1, t, 66.8, 0.022);
+      charsPop(h2, t, 68.0, 0.025);
+      captionAnim(cap, t, 70.0);
+      op(handle, t >= 70.4 ? 1 : 0); tf(handle, 0, 20 * (1 - E.back(seg(t, 70.4, 70.75))));
+    };
+  });
+
+  // ---------------- HUD ----------------
+  const hudG = el('g', {}, hud);
+  const caseNo = txt(hudG, 'BERKAS IGD · NYERI PERUT', { x: 64, y: 196, 'font-size': 24, 'font-family': F.mono, 'font-weight': 800 });
+  const chipG = el('g', {}, hudG);
+  const chipBg = el('rect', { x: 64, y: 212, height: 42, rx: 6 }, chipG);
+  const chipA = txt(chipG, '', { x: 78, y: 242, 'font-size': 24, 'font-family': F.mono, 'font-weight': 800 });
+  const chipB = txt(chipG, '', { y: 242, 'font-size': 24, 'font-family': F.mono, 'font-weight': 800 });
+  const clk = el('g', {}, hudG);
+  const clkBg = el('rect', { x: 846, y: 168, width: 170, height: 50, rx: 8, fill: 'none', 'stroke-width': 4 }, clk);
+  const rec = el('circle', { cx: 872, cy: 193, r: 9, fill: C.red }, clk);
+  const clkT = txt(clk, '02:14', { x: 892, y: 203, 'font-size': 28, 'font-family': F.mono, 'font-weight': 800 });
+  // shift clock: each section moves the night on
+  const CLOCK = ['02:14', '02:15', '02:21', '02:26', '02:31', '02:38', '02:47', '02:47', '02:47', '03:30'];
+  hudUpdate = t => {
+    const i = SEC.findIndex(c => t >= c[0] && t < c[1]);
+    show(hudG, i >= 0);
+    if (i < 0) return;
+    const c = SEC[i], dark = !!c[4];
+    const ink = dark ? C.card : C.navy;
+    caseNo.setAttribute('fill', ink);
+    chipBg.setAttribute('fill', ink);
+    chipA.textContent = c[2]; chipA.setAttribute('fill', dark ? C.red : C.mustard);
+    chipB.textContent = c[3]; chipB.setAttribute('fill', dark ? C.navy : C.card);
+    const wa = measure(c[2], 24, F.mono, 800), wb = measure(c[3], 24, F.mono, 800);
+    chipB.setAttribute('x', 78 + wa + 14);
+    chipBg.setAttribute('width', wa + wb + 42);
+    clkBg.setAttribute('stroke', ink); clkT.setAttribute('fill', ink); clkT.textContent = CLOCK[i];
+    op(rec, Math.floor(t * 2) % 2 ? 0.25 : 1);
+  };
+
+  // ---------------- dot wipe ----------------
+  const dotsG = el('g', {}, wipe);
+  const wipeDots = [];
+  for (let y = 0; y <= H + 90; y += 90) for (let x = 0; x <= W + 90; x += 90) wipeDots.push({ el: el('circle', { cx: x, cy: y, r: 0 }, dotsG), x, y });
+  const WIPES = [[6.5, C.mustard], [12, C.teal], [18, C.mustard], [23, C.navy], [30.5, C.night], [38, C.red], [46, C.teal], [56.5, C.mustard], [65.5, C.navy]];
+  WIPES.forEach(([tw]) => ev(tw - 0.22, 'wipe'));
+  wipeUpdate = t => {
+    const w = WIPES.find(([b]) => Math.abs(t - b) < 0.22);
+    show(dotsG, !!w);
+    if (!w) return;
+    dotsG.setAttribute('fill', w[1]);
+    const u = (t - w[0] + 0.22) / 0.44;
+    wipeDots.forEach(d => {
+      const delay = (d.x / W * 0.4 + d.y / H * 0.6) * 0.35;
+      const p = clamp((u - delay) / 0.65);
+      d.el.setAttribute('r', (Math.sin(p * Math.PI) * 72).toFixed(1));
+    });
+  };
+  SEC.forEach(c => ev(c[0], 'sec', { name: c[3] }));
+}
+let hudUpdate = () => {}, wipeUpdate = () => {};
+
+// ============================================================
+// paper & grain
+// ============================================================
+function buildPaper() {
+  const cv = document.getElementById('paper'), ctx = cv.getContext('2d');
+  const r = rng(3);
+  const small = document.createElement('canvas'); small.width = 54; small.height = 96;
+  const sctx = small.getContext('2d'); const sim = sctx.createImageData(54, 96);
+  for (let i = 0; i < sim.data.length; i += 4) { const v = 242 + r() * 13; sim.data[i] = sim.data[i + 1] = sim.data[i + 2] = v; sim.data[i + 3] = 255; }
+  sctx.putImageData(sim, 0, 0);
+  ctx.imageSmoothingEnabled = true; ctx.drawImage(small, 0, 0, W, H);
+  const base = ctx.getImageData(0, 0, W, H);
+  for (let i = 0; i < base.data.length; i += 4) {
+    const n = (r() - 0.5) * 24;
+    base.data[i] = clamp(base.data[i] + n, 0, 255);
+    base.data[i + 1] = clamp(base.data[i + 1] + n, 0, 255);
+    base.data[i + 2] = clamp(base.data[i + 2] + n - 4, 0, 255);
+  }
+  ctx.putImageData(base, 0, 0);
+  const gr = ctx.createRadialGradient(540, 960, 500, 540, 960, 1250);
+  gr.addColorStop(0, 'rgba(255,255,255,0)'); gr.addColorStop(1, 'rgba(120,100,80,0.32)');
+  ctx.fillStyle = gr; ctx.fillRect(0, 0, W, H);
+  ctx.strokeStyle = 'rgba(140,120,100,0.16)'; ctx.lineWidth = 3;
+  ctx.beginPath(); ctx.moveTo(0, 958); ctx.lineTo(W, 962); ctx.stroke();
+}
+function drawFx(frame) {
+  const cv = document.getElementById('fx'), ctx = cv.getContext('2d');
+  ctx.clearRect(0, 0, W, H);
+  const r = rng(1000 + Math.floor(frame / 2));
+  ctx.fillStyle = 'rgba(255,248,235,0.7)';
+  for (let i = 0; i < 420; i++) { ctx.beginPath(); ctx.arc(r() * W, r() * H, 0.6 + r() * 1.6, 0, 7); ctx.fill(); }
+  ctx.fillStyle = 'rgba(27,36,64,0.22)';
+  for (let i = 0; i < 80; i++) { ctx.beginPath(); ctx.arc(r() * W, r() * H, 0.6 + r() * 1.2, 0, 7); ctx.fill(); }
+}
+
+// ============================================================
+// render
+// ============================================================
+const boilT = document.getElementById('boilT');
+// grooving sections get a small beat pulse (120 BPM)
+const GROOVE = [[0, 2.0], [6.5, 23], [56.5, 65.5]];
+function render(t) {
+  const frame = Math.round(t * FPS);
+  boilT.setAttribute('seed', 1 + (Math.floor(t * 10) % 40));
+  let cur = null;
+  for (const s of scenes) {
+    const on = t >= s.t0 && t < s.t1;
+    show(s.g, on);
+    if (on) { s.update(t); cur = s; }
+  }
+  const c = Object.assign({ z: 1, cx: 540, cy: 960, px: 0, py: 0 }, cur && cur.cam ? cur.cam(t) : {});
+  let dx = 0, dy = 0;
+  for (const [t0, a, d] of SHAKES) if (t >= t0 && t < t0 + d) { const k = 1 - (t - t0) / d; dx += a * k * k * Math.sin(t * 91 + t0); dy += a * k * k * Math.cos(t * 77 + t0 * 3); }
+  const groove = GROOVE.some(([a, b]) => t >= a && t < b);
+  const pulse = groove ? 1 + 0.006 * Math.exp(-((t % 0.5) / 0.07)) : 1;
+  const z = c.z * pulse;
+  cam.setAttribute('transform', `translate(${(dx + c.px + c.cx * (1 - z)).toFixed(2)} ${(dy + c.py + c.cy * (1 - z)).toFixed(2)}) scale(${z.toFixed(4)})`);
+  let fl = 0;
+  for (const [f, pk, d] of FLASH) if (t >= f && t < f + d) fl = Math.max(fl, pk * Math.pow(1 - (t - f) / d, 2));
+  op(flash, fl);
+  op(fade, seg(t, 73.4, 73.95));
+  hudUpdate(t);
+  wipeUpdate(t);
+  drawFx(frame);
+}
+// every piece of copy on screen at t, with its box (for readcheck)
+window.TEXTS = t => {
+  render(t);
+  return TXT.filter(x => t >= x.t0 && t < x.t1).map(x => {
+    const b = x.node.getBoundingClientRect();
+    return { id: x.id, text: x.text, x0: b.left, y0: b.top, x1: b.right, y1: b.bottom };
+  });
+};
+
+async function init() {
+  const fams = ['400 50px "Alfa Slab One"', '400 50px "Bagel Fat One"', '400 50px "Caveat Brush"', '800 50px "JetBrains Mono"', '400 50px "Archivo Black"', '800 50px "Archivo"', '600 50px "Archivo"'];
+  const sample = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789:,.?!/+÷·°@-*() ';
+  await Promise.all(fams.map(f => document.fonts.load(f, sample)));
+  await document.fonts.ready;
+  buildPaper();
+  buildAll();
+  EV.sort((a, b) => a.t - b.t);
+  window.EV = EV;
+  window.DUR = DUR;
+  const q = new URLSearchParams(location.search);
+  render(parseFloat(q.get('t') || '0'));
+  window.READY = true;
+}
+window.render = render;
+init();
+</script>
+</body>
+</html>

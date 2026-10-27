@@ -1,0 +1,22 @@
+Berkas IGD: Nyeri Perut · third-party assets
+
+Picture
+- Engine helpers (halftone, stamp, caption bar, dot wipe, paper and grain) adapted from the
+  Lemo-Opuscar "halftone-dossier" demo, github.com/lemomo-ai/lemo-opuscar · MIT License.
+- All props, layouts and animation drawn in code for this film. No photographs, no generated images.
+
+Fonts (Google Fonts, self-hosted in fonts/) · SIL Open Font License 1.1
+- Alfa Slab One · JM Solé
+- Bagel Fat One · Kim Jung-hee
+- Caveat Brush · Impallari Type
+- JetBrains Mono · JetBrains
+- Archivo Black, Archivo · Omnibus-Type
+
+Sound
+- Score and all sound effects synthesized in code (mix.py, numpy/scipy). No samples, no stock audio.
+  Instrument recipes adapted from the same Lemo-Opuscar demo (MIT).
+
+Content
+- Clinical case is an illustrative composite; no real patient data.
+  Shock index = heart rate ÷ systolic BP (94 ÷ 114 = 0.82; 126 ÷ 84 = 1.50).
+  The vital-sign curve in the "Kenapa?" beat is labelled as an illustration, not to scale.
