@@ -288,7 +288,7 @@ const CARDTXT = [
   ['k2b', 'KB: pil', 'pc', 8.3, 11.75],
   ['k3', 'TD 114/76 · NADI 94 · NAPAS 18 · SUHU 36,8', 'tri', 13.0, 17.75], ['k3si', 'SHOCK INDEX 0,82', 'si', 15.2, 17.75],
   ['k5', 'kadang lupa minum?', 'pc2', 26.4, 30.3], ['k6', 'NADI 126 · TD 84/52', 'mon', 34.4, 37.3], ['k6si', 'SHOCK INDEX 1,50', 'mon', 34.7, 37.3],
-  ['k7', 'KEHAMILAN EKTOPIK TERGANGGU', 'banner', 42.3, 46.6], ['k7s0', '2 jalur infus besar', 'sticky', 43.6, 46.6], ['k7s1', 'siapkan darah', 'sticky', 43.95, 46.6], ['k7s2', 'telepon SpOG', 'sticky', 44.3, 46.6],
+  ['k7', 'KEHAMILAN EKTOPIK TERGANGGU', 'banner', 42.3, 45.85], ['k7s0', '2 jalur infus besar', 'sticky', 43.6, 46.6], ['k7s1', 'siapkan darah', 'sticky', 43.95, 46.6], ['k7s2', 'telepon SpOG', 'sticky', 44.3, 46.6],
   ['k8', 'pasien ini di sini', 'chart', 50.5, 56], ['k9a', '1 Tes kehamilan', 'ck1', 60.5, 65.2], ['k9b', '2 Hitung shock index', 'ck2', 61.1, 65.2], ['k9c', '3 Cari cairan bebas', 'ck3', 61.7, 65.2],
 ];
 
@@ -369,7 +369,7 @@ window.render = function (t, noGL) {
   cards.resep3.m.userData.redraw({ cross: 1, thick: seg(t, 66.6, 67.2) });
   // banner drops on its strings at 42.0
   const bk = t < 41.9 ? 0 : spring(t - 41.9, 6, .32);
-  banner.visible = t > 41.85 && t < 46.7; banner.position.y = lerp(.5, .235, clamp(bk, 0, 1.2)); banner.rotation.z = Math.sin((t - 42) * 5) * .04 * Math.exp(-(t - 42) * 1.5);
+  banner.visible = t > 41.85 && t < 45.85; banner.position.y = lerp(.5, .235, clamp(bk, 0, 1.2)); banner.rotation.z = Math.sin((t - 42) * 5) * .04 * Math.exp(-(t - 42) * 1.5);
   // sticky note on the desk
   sticky.visible = t > 42.9 && t < 46.7;
   if (sticky.visible) { const k = eo(seg(t, 42.9, 43.15)); sticky.position.y = (1 - k) * .03; const s = [0, 1, 2].map(i => seg(t, 43.15 + i * .35, 43.6 + i * .35)); const key = s.map(v => v.toFixed(2)).join(); if (sticky.userData.key !== key) { sticky.userData.key = key; A.drawStickyNote(snC.getContext('2d'), SN, SN, s); snT.needsUpdate = true; } }
