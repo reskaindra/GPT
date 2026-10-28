@@ -200,8 +200,8 @@ const SH = [
   [[18, .05, .4, .86, -.03, .07, .13, 40, 2.2], [23, .05, .38, .8, -.03, .07, .13, 40, 2.2]],
   [[23, .05, .17, .42, .035, .085, .07, 38, 2.8], [25.6, .05, .18, .46, .035, .085, .07, 38, 2.8], [26.6, 0, .55, 1.02, 0, .07, .15, 40, 2.0], [30.5, -.02, .53, 1.0, 0, .07, .15, 40, 2.0]],
   [[30.5, 0, .56, 1.04, 0, .07, .15, 40, 2.0], [38, 0, .5, .94, 0, .07, .15, 40, 2.0]],
-  [[38, 0, .6, 1.08, 0, .06, .22, 40, 2.0], [42, 0, .57, 1.04, 0, .06, .22, 40, 2.0], [46, 0, .56, 1.02, 0, .06, .22, 40, 2.0]],
-  [[46, 0, .2, 1.12, 0, .18, .03, 40, 1.8], [56.5, 0, .19, 1.06, 0, .18, .03, 40, 1.8]],
+  [[38, 0, .6, 1.08, 0, .06, .22, 40, 2.0], [42, 0, .57, 1.04, 0, .06, .22, 40, 2.0], [46.6, 0, .56, 1.02, 0, .06, .22, 40, 2.0]],
+  [[46.6, 0, .2, 1.12, 0, .18, .03, 40, 1.8], [56.5, 0, .19, 1.06, 0, .18, .03, 40, 1.8]],
   [[56.5, 0, .62, .98, 0, .06, .15, 40, 2.0], [65.5, 0, .6, .94, 0, .06, .15, 40, 2.0]],
   [[65.5, 0, .58, 1.02, 0, .06, .17, 40, 2.0], [70, 0, .64, 1.1, 0, .05, .17, 40, 2.0], [74, 0, .95, 1.45, 0, .03, .15, 40, 1.8]],
 ];
@@ -287,8 +287,8 @@ function bubble(id, text, t0, t1, an) {
 const CARDTXT = [
   ['k2b', 'KB: pil', 'pc', 8.3, 11.75],
   ['k3', 'TD 114/76 · NADI 94 · NAPAS 18 · SUHU 36,8', 'tri', 13.0, 17.75], ['k3si', 'SHOCK INDEX 0,82', 'si', 15.2, 17.75],
-  ['k5', 'kadang lupa minum?', 'pc2', 26.4, 30.3], ['k6', 'NADI 126 · TD 84/52', 'mon', 34.4, 37.3], ['k6si', 'SHOCK INDEX 1,50', 'mon', 35.2, 37.3],
-  ['k7', 'KEHAMILAN EKTOPIK TERGANGGU', 'banner', 42.3, 46], ['k7s', '2 jalur infus besar · siapkan darah · telepon SpOG', 'sticky', 43.9, 46],
+  ['k5', 'kadang lupa minum?', 'pc2', 26.4, 30.3], ['k6', 'NADI 126 · TD 84/52', 'mon', 34.4, 37.3], ['k6si', 'SHOCK INDEX 1,50', 'mon', 34.7, 37.3],
+  ['k7', 'KEHAMILAN EKTOPIK TERGANGGU', 'banner', 42.3, 46.6], ['k7s0', '2 jalur infus besar', 'sticky', 43.6, 46.6], ['k7s1', 'siapkan darah', 'sticky', 43.95, 46.6], ['k7s2', 'telepon SpOG', 'sticky', 44.3, 46.6],
   ['k8', 'pasien ini di sini', 'chart', 50.5, 56], ['k9a', '1 Tes kehamilan', 'ck1', 60.5, 65.2], ['k9b', '2 Hitung shock index', 'ck2', 61.1, 65.2], ['k9c', '3 Cari cairan bebas', 'ck3', 61.7, 65.2],
 ];
 
@@ -364,14 +364,14 @@ window.render = function (t, noGL) {
   cards.resep2.m.userData.redraw({ write1: seg(t, 19.6, 20.4), write2: seg(t, 20.6, 21.1) * .5, sig: 0 });
   cards.pc2.m.userData.redraw({ kb: 1, ring: 1, note: 1, noteK: seg(t, 26.4, 27.1) });
   const hr = HRf(t), ps = seg(t, 32.4, 34.4);
-  if (cards.mon.g.visible) cards.mon.m.userData.redraw({ hr, bp: `${Math.round(lerp(96, 84, ps))}/${Math.round(lerp(60, 52, ps))}`, t: Math.round(t * 30) / 30, alarm: t > 34.8, si: seg(t, 34.8, 35.1) });
+  if (cards.mon.g.visible) cards.mon.m.userData.redraw({ hr, bp: `${Math.round(lerp(96, 84, ps))}/${Math.round(lerp(60, 52, ps))}`, t: Math.round(t * 30) / 30, alarm: t > 34.8, si: seg(t, 34.4, 34.7) });
   cards.tp.m.userData.redraw({ tline: seg(t, 38.9, 39.2) });
   cards.resep3.m.userData.redraw({ cross: 1, thick: seg(t, 66.6, 67.2) });
   // banner drops on its strings at 42.0
   const bk = t < 41.9 ? 0 : spring(t - 41.9, 6, .32);
-  banner.visible = t > 41.85 && t < 46.2; banner.position.y = lerp(.5, .235, clamp(bk, 0, 1.2)); banner.rotation.z = Math.sin((t - 42) * 5) * .04 * Math.exp(-(t - 42) * 1.5);
+  banner.visible = t > 41.85 && t < 46.7; banner.position.y = lerp(.5, .235, clamp(bk, 0, 1.2)); banner.rotation.z = Math.sin((t - 42) * 5) * .04 * Math.exp(-(t - 42) * 1.5);
   // sticky note on the desk
-  sticky.visible = t > 42.9 && t < 46.3;
+  sticky.visible = t > 42.9 && t < 46.7;
   if (sticky.visible) { const k = eo(seg(t, 42.9, 43.15)); sticky.position.y = (1 - k) * .03; const s = [0, 1, 2].map(i => seg(t, 43.15 + i * .35, 43.6 + i * .35)); const key = s.map(v => v.toFixed(2)).join(); if (sticky.userData.key !== key) { sticky.userData.key = key; A.drawStickyNote(snC.getContext('2d'), SN, SN, s); snT.needsUpdate = true; } }
   // characters
   for (const [actor, st] of [[patient, patientState(t)], [doctor, doctorState(t)]]) {
@@ -414,7 +414,7 @@ window.TEXTS = t => {
   for (const [id, text, t0, t1] of all) if (t >= t0 && t < t1 && BOX[id]) { const b = BOX[id]; out.push({ id, text: text.replace(/\*/g, ''), x0: b[0], y0: b[1], x1: b[2], y1: b[3] }); }
   for (const [id, text, card, t0, t1] of CARDTXT) {
     if (t < t0 || t >= t1) continue;
-    const obj = card === 'banner' ? banner : card === 'sticky' ? sticky.userData.top : card === 'chart' ? null : cards[card].g;
+    const obj = card === 'banner' ? banner.children[0] : card === 'sticky' ? sticky.userData.top : card === 'chart' ? null : cards[card].g;
     const b = obj ? boxOf(obj) : [200, 600, 880, 1100];
     if (b) out.push({ id, text, x0: b[0], y0: b[1], x1: b[2], y1: b[3] });
   }
