@@ -1,0 +1,21 @@
+Buku Jaga IGD · third-party assets
+
+Picture
+- Engine modules lib.js, paper.js, cutmesh.js, book.js, post.js (pop-up book, cut-paper finish, cut-out shadows,
+  depth of field) from the Lemo-Opuscar "paper-popup" demo, github.com/lemomo-ai/lemo-opuscar · MIT License.
+  book.js cover text changed for this film.
+- three.js r170 · MIT License.
+- Poly Haven (CC0): lythwood_lounge HDRI, american_walnut_veneer textures, desk_lamp_arm_01, tea_set_01.
+- Characters, set pieces, cards and pages drawn in code for this film. No photographs, no generated images.
+
+Fonts · SIL Open Font License 1.1
+- Fredoka, Lilita One, IM Fell English (subsets from Lemo-Opuscar core/fonts, see their OFL.md)
+- Caveat Brush · Impallari Type
+
+Sound
+- Score and foley synthesized in code (mix.py, numpy/scipy). No samples, no stock audio.
+
+Content
+- Illustrative composite case; no real patient data.
+  Shock index = heart rate ÷ systolic BP (94 ÷ 114 = 0.82; 126 ÷ 84 = 1.50).
+  The vital-sign chart is labelled as an illustration, not to scale.
